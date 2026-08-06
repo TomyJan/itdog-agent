@@ -15,7 +15,10 @@ tmp_dir=$(mktemp -d)
 cleanup() {
   rm -rf "$tmp_dir"
 }
-trap cleanup EXIT HUP INT TERM
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 validate_architecture() {
   agent=$1

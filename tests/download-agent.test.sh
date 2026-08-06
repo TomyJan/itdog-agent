@@ -34,6 +34,11 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
+if [ "${CURL_SEND_TERM:-0}" = 1 ]; then
+  kill -TERM "$PPID"
+  exit 0
+fi
+
 case "$url" in
   */agent_amd64.tar.gz) archive="$FIXTURE_DIR/agent_amd64.tar.gz" ;;
   */agent_arm64.tar.gz) archive="$FIXTURE_DIR/agent_arm64.tar.gz" ;;
@@ -118,6 +123,20 @@ assert_unsafe_archive_path_fails() {
   echo 'ok - rejects unsafe archive paths'
 }
 
+assert_term_signal_exits_immediately() {
+  error_log="$test_root/term-signal.log"
+  set +e
+  CURL_SEND_TERM=1 run_download >"$error_log" 2>&1
+  status=$?
+  set -e
+  if [ "$status" -ne 143 ]; then
+    echo "not ok - TERM should exit with 143, got $status" >&2
+    exit 1
+  fi
+  echo 'ok - TERM exits immediately with signal status'
+}
+
 assert_successful_download
 assert_wrong_architecture_fails
 assert_unsafe_archive_path_fails
+assert_term_signal_exits_immediately
