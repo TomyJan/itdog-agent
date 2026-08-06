@@ -58,10 +58,12 @@ jobs:
           fi
 
           artifact_name="itdog-agent-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          echo "changed=$changed" >> "$GITHUB_OUTPUT"
-          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
-          echo "amd64_sha256=$amd64_sha256" >> "$GITHUB_OUTPUT"
-          echo "arm64_sha256=$arm64_sha256" >> "$GITHUB_OUTPUT"
+          {
+            echo "changed=$changed"
+            echo "artifact_name=$artifact_name"
+            echo "amd64_sha256=$amd64_sha256"
+            echo "arm64_sha256=$arm64_sha256"
+          } >> "$GITHUB_OUTPUT"
 
           {
             echo '## Agent update check'

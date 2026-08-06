@@ -130,9 +130,11 @@ jobs:
           fi
 
           bundle_sha256=$(printf '%s\n%s\n' "$amd64_sha256" "$arm64_sha256" | sha256sum | cut -d ' ' -f 1)
-          echo "amd64_sha256=$amd64_sha256" >> "$GITHUB_OUTPUT"
-          echo "arm64_sha256=$arm64_sha256" >> "$GITHUB_OUTPUT"
-          echo "bundle_sha256=$bundle_sha256" >> "$GITHUB_OUTPUT"
+          {
+            echo "amd64_sha256=$amd64_sha256"
+            echo "arm64_sha256=$arm64_sha256"
+            echo "bundle_sha256=$bundle_sha256"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
@@ -192,6 +194,6 @@ jobs:
             echo "- Image: \`$IMAGE:$VERSION\`"
             echo "- Latest: \`$IMAGE:latest\`"
             echo "- Digest: \`$DIGEST\`"
-            echo '- Platforms: `linux/amd64`, `linux/arm64`'
-            echo '- Docker Hub description: synced from `README.md`'
+            echo "- Platforms: \`linux/amd64\`, \`linux/arm64\`"
+            echo "- Docker Hub description: synced from \`README.md\`"
           } >> "$GITHUB_STEP_SUMMARY"
