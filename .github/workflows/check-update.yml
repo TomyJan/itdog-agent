@@ -1,0 +1,91 @@
+name: Check agent update
+
+on:
+  schedule:
+    # GitHub cron uses UTC; 16:00 UTC is 00:00 in Asia/Singapore.
+    - cron: '0 16 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: itdog-agent-update-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      changed: ${{ steps.compare.outputs.changed }}
+      artifact_name: ${{ steps.compare.outputs.artifact_name }}
+      amd64_sha256: ${{ steps.compare.outputs.amd64_sha256 }}
+      arm64_sha256: ${{ steps.compare.outputs.arm64_sha256 }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Restore last published agents
+        uses: actions/cache/restore@v4
+        with:
+          path: agent-downloads
+          key: itdog-agent-probe-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            itdog-agent-v1-
+
+      - name: Download current official agents
+        run: ./scripts/download-agent.sh current-downloads
+
+      - name: Compare agent binaries
+        id: compare
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          amd64_sha256=$(sha256sum current-downloads/agent_amd64 | cut -d ' ' -f 1)
+          arm64_sha256=$(sha256sum current-downloads/agent_arm64 | cut -d ' ' -f 1)
+          changed=true
+
+          if [[ -f agent-downloads/agent_amd64 && -f agent-downloads/agent_arm64 ]]; then
+            cached_amd64_sha256=$(sha256sum agent-downloads/agent_amd64 | cut -d ' ' -f 1)
+            cached_arm64_sha256=$(sha256sum agent-downloads/agent_arm64 | cut -d ' ' -f 1)
+            if [[ "$amd64_sha256" == "$cached_amd64_sha256" && \
+                  "$arm64_sha256" == "$cached_arm64_sha256" ]]; then
+              changed=false
+            fi
+          fi
+
+          artifact_name="itdog-agent-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
+          echo "amd64_sha256=$amd64_sha256" >> "$GITHUB_OUTPUT"
+          echo "arm64_sha256=$arm64_sha256" >> "$GITHUB_OUTPUT"
+
+          {
+            echo '## Agent update check'
+            echo
+            echo "- Changed: \`$changed\`"
+            echo "- amd64: \`$amd64_sha256\`"
+            echo "- arm64: \`$arm64_sha256\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload changed agents
+        if: steps.compare.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.compare.outputs.artifact_name }}
+          path: current-downloads/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: check
+    if: needs.check.outputs.changed == 'true'
+    uses: ./.github/workflows/docker.yml
+    with:
+      agent_artifact: ${{ needs.check.outputs.artifact_name }}
+      amd64_sha256: ${{ needs.check.outputs.amd64_sha256 }}
+      arm64_sha256: ${{ needs.check.outputs.arm64_sha256 }}
+    secrets: inherit

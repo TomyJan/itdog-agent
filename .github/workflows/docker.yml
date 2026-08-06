@@ -1,0 +1,186 @@
+name: Docker
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Image version; defaults to today's YYYYMMDD in Asia/Singapore
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      version:
+        description: Image version; defaults to today's YYYYMMDD in Asia/Singapore
+        required: false
+        type: string
+      agent_artifact:
+        description: Artifact containing agent_amd64 and agent_arm64
+        required: false
+        type: string
+      amd64_sha256:
+        description: Expected SHA-256 for agent_amd64 when using an artifact
+        required: false
+        type: string
+      arm64_sha256:
+        description: Expected SHA-256 for agent_arm64 when using an artifact
+        required: false
+        type: string
+    secrets:
+      DOCKERHUB_USERNAME:
+        description: Docker Hub username
+        required: true
+      DOCKERHUB_TOKEN:
+        description: Docker Hub access token with Read & Write permission
+        required: true
+    outputs:
+      image:
+        description: Published Docker Hub image name
+        value: ${{ jobs.publish.outputs.image }}
+      version:
+        description: Published image version
+        value: ${{ jobs.publish.outputs.version }}
+      digest:
+        description: Published multi-platform manifest digest
+        value: ${{ jobs.publish.outputs.digest }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: itdog-agent-docker-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      image: ${{ steps.release.outputs.image }}
+      version: ${{ steps.release.outputs.version }}
+      digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve release metadata
+        id: release
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version=${INPUT_VERSION:-$(TZ=Asia/Singapore date +%Y%m%d)}
+          if [[ ! "$version" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo "Invalid Docker tag: $version" >&2
+            exit 1
+          fi
+
+          username=$(printf '%s' "$DOCKERHUB_USERNAME" | tr '[:upper:]' '[:lower:]')
+          if [[ ! "$username" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
+            echo 'DOCKERHUB_USERNAME is empty or invalid' >&2
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "image=$username/itdog-agent" >> "$GITHUB_OUTPUT"
+
+      - name: Download checked agent artifact
+        if: inputs.agent_artifact != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.agent_artifact }}
+          path: agent-downloads
+
+      - name: Download current official agents
+        if: inputs.agent_artifact == ''
+        run: ./scripts/download-agent.sh agent-downloads
+
+      - name: Verify agent binaries
+        id: agents
+        env:
+          AGENT_ARTIFACT: ${{ inputs.agent_artifact }}
+          EXPECTED_AMD64_SHA256: ${{ inputs.amd64_sha256 }}
+          EXPECTED_ARM64_SHA256: ${{ inputs.arm64_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -n "$AGENT_ARTIFACT" ]] && \
+             { [[ -z "$EXPECTED_AMD64_SHA256" ]] || [[ -z "$EXPECTED_ARM64_SHA256" ]]; }; then
+            echo 'Expected SHA-256 values are required with agent_artifact' >&2
+            exit 1
+          fi
+
+          file agent-downloads/agent_amd64 | grep -q 'ELF 64-bit.*x86-64'
+          file agent-downloads/agent_arm64 | grep -q 'ELF 64-bit.*ARM aarch64'
+
+          amd64_sha256=$(sha256sum agent-downloads/agent_amd64 | cut -d ' ' -f 1)
+          arm64_sha256=$(sha256sum agent-downloads/agent_arm64 | cut -d ' ' -f 1)
+
+          if [[ -n "$EXPECTED_AMD64_SHA256" && "$amd64_sha256" != "$EXPECTED_AMD64_SHA256" ]]; then
+            echo 'agent_amd64 SHA-256 does not match the checked artifact' >&2
+            exit 1
+          fi
+          if [[ -n "$EXPECTED_ARM64_SHA256" && "$arm64_sha256" != "$EXPECTED_ARM64_SHA256" ]]; then
+            echo 'agent_arm64 SHA-256 does not match the checked artifact' >&2
+            exit 1
+          fi
+
+          bundle_sha256=$(printf '%s\n%s\n' "$amd64_sha256" "$arm64_sha256" | sha256sum | cut -d ' ' -f 1)
+          echo "amd64_sha256=$amd64_sha256" >> "$GITHUB_OUTPUT"
+          echo "arm64_sha256=$arm64_sha256" >> "$GITHUB_OUTPUT"
+          echo "bundle_sha256=$bundle_sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ steps.release.outputs.image }}:${{ steps.release.outputs.version }}
+            ${{ steps.release.outputs.image }}:latest
+          build-args: |
+            VERSION=${{ steps.release.outputs.version }}
+            SOURCE_REPOSITORY=${{ github.server_url }}/${{ github.repository }}
+            SOURCE_REVISION=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Cache successfully published agents
+        uses: actions/cache/save@v4
+        with:
+          path: agent-downloads
+          key: itdog-agent-v1-${{ steps.agents.outputs.bundle_sha256 }}
+
+      - name: Write release summary
+        env:
+          IMAGE: ${{ steps.release.outputs.image }}
+          VERSION: ${{ steps.release.outputs.version }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        shell: bash
+        run: |
+          {
+            echo '## Docker image published'
+            echo
+            echo "- Image: \`$IMAGE:$VERSION\`"
+            echo "- Latest: \`$IMAGE:latest\`"
+            echo "- Digest: \`$DIGEST\`"
+            echo '- Platforms: `linux/amd64`, `linux/arm64`'
+          } >> "$GITHUB_STEP_SUMMARY"
