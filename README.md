@@ -2,6 +2,9 @@
 
 将 ITDOG 贡献节点 Agent 封装为 Docker 镜像，支持 `linux/amd64` 和 `linux/arm64`。
 
+- **源码仓库：** [GitHub](https://github.com/TomyJan/itdog-agent)
+- **Docker 镜像：** [Docker Hub](https://hub.docker.com/r/tomyjan/itdog-agent)
+
 本仓库不是 ITDOG 官方项目。镜像中的 agent 二进制直接来自 ITDOG 官方下载地址：
 
 - `https://dl.itdog.cn/agent/agent_amd64.tar.gz`
