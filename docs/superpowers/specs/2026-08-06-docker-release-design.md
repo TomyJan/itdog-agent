@@ -53,10 +53,12 @@
 - agent 路径：`/usr/local/bin/itdog-agent`
 - 状态卷：`/opt/itdog-agent`
 - PID 1：`tini`
-- 入口脚本：校验 `DEVICE_UUID` 后使用 `exec` 启动 agent
+- 入口脚本：校验 `DEVICE_UUID`，同步安装状态后使用 `exec` 启动 agent
 - OCI 标签：版本、源码仓库、源码 revision
 
 agent 放在状态卷之外，避免挂载 `/opt/itdog-agent` 后遮蔽可执行文件。
+
+官方脚本每次安装二进制时都会删除旧 `node_id`，但 systemd 服务重启时不会删除。容器入口脚本在状态卷中记录当前 agent SHA-256 和 `DEVICE_UUID`：镜像内二进制或 UUID 发生变化时删除 `node_id`，普通容器重启时保留。这样既避免旧身份跨安装沿用，也不会因 Docker 重启策略反复注册节点。
 
 ### Docker 发布工作流
 
@@ -130,4 +132,3 @@ PowerShell 使用等价的环境变量赋值后运行 `docker compose up -d`。�
 - Compose 展开后包含镜像、UUID、能力、卷和 `nofile` 配置。
 - Dockerfile 仅声明 `amd64`、`arm64` 所需路径，并包含已核验的运行依赖。
 - Docker 守护进程可用时，实际构建本机架构镜像并验证入口行为；不可用时明确记录该验证缺口。
-
