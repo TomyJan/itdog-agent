@@ -1,0 +1,6 @@
+*
+!Dockerfile
+!docker-entrypoint.sh
+!agent-downloads/
+!agent-downloads/agent_amd64
+!agent-downloads/agent_arm64
