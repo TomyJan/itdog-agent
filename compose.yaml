@@ -1,0 +1,17 @@
+services:
+  itdog-agent:
+    image: "${ITDOG_AGENT_IMAGE:-tomyjan/itdog-agent:latest}"
+    environment:
+      DEVICE_UUID: "${DEVICE_UUID:?请设置 DEVICE_UUID 环境变量}"
+    cap_add:
+      - NET_RAW
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    volumes:
+      - itdog-agent-data:/opt/itdog-agent
+    restart: unless-stopped
+
+volumes:
+  itdog-agent-data:
