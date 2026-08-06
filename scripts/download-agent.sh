@@ -46,6 +46,10 @@ for arch in amd64 arm64; do
     "$base_url/agent_${arch}.tar.gz" \
     --output "$archive"
 
+  members=$(tar -tzf "$archive") || fail "$arch 压缩包目录列表读取失败"
+  if printf '%s\n' "$members" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+    fail "$arch 压缩包包含归档路径不安全的成员"
+  fi
   tar -xzf "$archive" -C "$extract_dir"
   agent=$(find "$extract_dir" -type f -name agent -print -quit)
   [ -n "$agent" ] || fail "$arch 压缩包中未找到 agent 可执行文件"

@@ -61,7 +61,25 @@ esac
 printf '%s: %s\n' "$target" "$description"
 EOF
 
-chmod +x "$fake_bin/curl" "$fake_bin/file"
+cat > "$fake_bin/tar" <<'EOF'
+#!/bin/sh
+set -eu
+
+for option do
+  case "$option" in
+    -t*)
+      if [ "${TAR_FORCE_TRAVERSAL:-0}" = 1 ]; then
+        printf '../../outside\n'
+        exit 0
+      fi
+      ;;
+  esac
+done
+
+exec /usr/bin/tar "$@"
+EOF
+
+chmod +x "$fake_bin/curl" "$fake_bin/file" "$fake_bin/tar"
 
 run_download() {
   rm -rf "$output_dir"
@@ -90,5 +108,16 @@ assert_wrong_architecture_fails() {
   echo 'ok - rejects an architecture mismatch'
 }
 
+assert_unsafe_archive_path_fails() {
+  error_log="$test_root/unsafe-archive.log"
+  if TAR_FORCE_TRAVERSAL=1 run_download >"$error_log" 2>&1; then
+    echo 'not ok - unsafe archive path should fail' >&2
+    exit 1
+  fi
+  grep -q '归档路径不安全' "$error_log"
+  echo 'ok - rejects unsafe archive paths'
+}
+
 assert_successful_download
 assert_wrong_architecture_fails
+assert_unsafe_archive_path_fails
