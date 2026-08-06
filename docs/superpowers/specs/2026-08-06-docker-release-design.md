@@ -76,7 +76,8 @@ agent 放在状态卷之外，避免挂载 `/opt/itdog-agent` 后遮蔽可执行
 5. 使用 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN` 登录 Docker Hub。
 6. 通过 QEMU、Buildx 构建并推送多架构镜像。
 7. 发布 `<version>` 和 `latest` 两个标签。
-8. 仅在镜像推送成功后，以组合二进制 SHA-256 为键保存 GitHub Actions 缓存。
+8. 将仓库 README 和短描述同步到 Docker Hub 仓库页面。
+9. 仅在镜像推送和元信息同步成功后，以组合二进制 SHA-256 为键保存 GitHub Actions 缓存。
 
 版本值必须满足 Docker 标签格式。缺少 Secret、哈希不匹配或任一平台构建失败时，不更新任何缓存记录。
 
@@ -118,9 +119,9 @@ PowerShell 使用等价的环境变量赋值后运行 `docker compose up -d`。�
 仓库需要配置以下 GitHub Actions Secrets：
 
 - `DOCKERHUB_USERNAME`：Docker Hub 用户名。
-- `DOCKERHUB_TOKEN`：Docker Hub Personal Access Token，至少具有目标仓库的 Read & Write 权限。
+- `DOCKERHUB_TOKEN`：Docker Hub Personal Access Token，具有目标仓库的 Read、Write、Delete 权限；Delete 权限提供更新仓库简介所需的管理能力。
 
-工作流仅申请 `contents: read` 权限。Docker Hub Token 不传入 Docker build 上下文，也不会写入镜像层。
+工作流仅申请 `contents: read` 权限。Docker Hub Token 只用于镜像发布和仓库元信息同步，不传入 Docker build 上下文，也不会写入镜像层。
 
 ## 测试与验证
 

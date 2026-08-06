@@ -292,7 +292,7 @@ on:
         required: true
 ```
 
-作业中必须完成输入版本校验、artifact/官方下载二选一、预期哈希校验、Docker Hub 登录、QEMU/Buildx 初始化，以及 `linux/amd64,linux/arm64` 构建推送。版本为空时通过 `TZ=Asia/Singapore date +%Y%m%d` 计算。
+作业中必须完成输入版本校验、artifact/官方下载二选一、预期哈希校验、Docker Hub 登录、QEMU/Buildx 初始化、`linux/amd64,linux/arm64` 构建推送，以及 README 和短描述同步。版本为空时通过 `TZ=Asia/Singapore date +%Y%m%d` 计算。
 
 - [ ] **步骤 2：创建每日更新检查工作流**
 
@@ -367,4 +367,3 @@ git status --short
 ```
 
 预期：测试和 lint 全部通过；Git 状态只包含已明确保留的用户文件。
-

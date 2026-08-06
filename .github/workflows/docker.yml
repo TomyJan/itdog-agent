@@ -30,7 +30,7 @@ on:
         description: Docker Hub username
         required: true
       DOCKERHUB_TOKEN:
-        description: Docker Hub access token with Read & Write permission
+        description: Docker Hub access token with Read, Write & Delete permission
         required: true
     outputs:
       image:
@@ -163,6 +163,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Update Docker Hub description
+        uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ steps.release.outputs.image }}
+          short-description: Unofficial Docker image for the ITDOG contributed node agent
+          readme-filepath: ./README.md
+          enable-url-completion: true
+
       - name: Cache successfully published agents
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
@@ -183,4 +193,5 @@ jobs:
             echo "- Latest: \`$IMAGE:latest\`"
             echo "- Digest: \`$DIGEST\`"
             echo '- Platforms: `linux/amd64`, `linux/arm64`'
+            echo '- Docker Hub description: synced from `README.md`'
           } >> "$GITHUB_STEP_SUMMARY"

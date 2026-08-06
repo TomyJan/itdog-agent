@@ -78,7 +78,7 @@ docker compose up -d
 ### Docker Hub 准备
 
 1. 在 Docker Hub 创建名为 `itdog-agent` 的仓库。
-2. 创建具有目标仓库 Read & Write 权限的 Personal Access Token。
+2. 创建具有目标仓库 Read、Write、Delete 权限的 Personal Access Token。Docker Hub 更新仓库简介需要 Delete 权限对应的仓库管理能力。
 3. 在 GitHub 仓库的 `Settings > Secrets and variables > Actions` 中添加：
 
 | Secret | 内容 |
@@ -86,7 +86,7 @@ docker compose up -d
 | `DOCKERHUB_USERNAME` | Docker Hub 用户名 |
 | `DOCKERHUB_TOKEN` | Docker Hub Personal Access Token |
 
-发布目标由 Secret 动态计算为 `<DOCKERHUB_USERNAME>/itdog-agent`。Token 只用于 Docker Hub 登录，不会传入 Docker build 上下文或镜像层。
+发布目标由 Secret 动态计算为 `<DOCKERHUB_USERNAME>/itdog-agent`。Token 用于 Docker Hub 登录和更新仓库元信息，不会传入 Docker build 上下文或镜像层。
 
 ### 手动发布
 
@@ -98,6 +98,8 @@ docker compose up -d
 - `<DOCKERHUB_USERNAME>/itdog-agent:latest`
 
 两个标签都是包含 `linux/amd64`、`linux/arm64` 的多架构 manifest。
+
+镜像推送成功后，工作流还会把本 README 同步到 Docker Hub Overview，并更新仓库短描述。Dockerfile 中的 OCI 标签属于镜像元数据，Docker Hub 不会自动用它们填充仓库页面。
 
 ### 由其他工作流调用
 
