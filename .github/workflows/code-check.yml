@@ -69,6 +69,9 @@ jobs:
       - name: Test container entrypoint
         run: bash tests/docker-entrypoint.test.sh
 
+      - name: Test Compose configuration
+        run: bash tests/compose.test.sh
+
   build:
     name: Build
     runs-on: ubuntu-latest

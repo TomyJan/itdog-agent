@@ -52,6 +52,40 @@ docker compose up -d
 
 镜像内 agent 二进制或 `DEVICE_UUID` 变化时，入口脚本会删除旧 `node_id` 并重新注册。普通容器重启会保留现有 `node_id`。
 
+### IPv6 连通性
+
+Compose 默认创建 IPv4/IPv6 双栈网络。Docker 为容器分配 ULA IPv6 地址，并通过宿主机 NAT66 访问公网。宿主机必须先具备可用的公网 IPv6 地址和默认路由：
+
+```bash
+ip -6 address show scope global
+ip -6 route show default
+```
+
+如果宿主机通过路由通告（Router Advertisement，RA）获取 IPv6 默认路由，Docker 启用 IPv6 转发后，Linux 会在 `accept_ra=1` 时停止接受 RA。启动容器前，应将上联网卡的 `accept_ra` 持久化为 `2`。以下示例的上联网卡为 `ens18`，请按实际接口名修改：
+
+```bash
+UPLINK=ens18
+printf 'net.ipv6.conf.%s.accept_ra = 2\n' "$UPLINK" \
+  | sudo tee /etc/sysctl.d/90-docker-ipv6-ra.conf
+sudo sysctl --system
+```
+
+应用后确认默认路由和宿主机 IPv6 出站正常：
+
+```bash
+ip -6 route show default
+curl -6 --connect-timeout 10 https://api64.ipify.org
+```
+
+如果默认路由已经消失，需要先通过宿主机网络管理服务重新获取 RA，或按网络服务商提供的 IPv6 网关临时恢复默认路由。
+
+从旧版 IPv4-only Compose 网络升级时，需要重建默认网络才能应用 IPv6 配置。以下操作会短暂停止容器，但不会删除命名卷中的节点状态：
+
+```bash
+docker compose down
+docker compose up -d
+```
+
 ### 使用其他镜像
 
 Compose 默认拉取 `tomyjan/itdog-agent:latest`。fork 本仓库或使用固定版本时，可以额外设置 `ITDOG_AGENT_IMAGE`：
@@ -73,6 +107,7 @@ docker compose up -d
 | `LimitNOFILE=1048576` | Compose `nofile` 软硬限制均为 `1048576` |
 | systemd 自动重启 | `restart: unless-stopped` |
 | root 服务创建原始 ICMP socket | 仅增加 `NET_RAW` capability |
+| 直接使用宿主机 IP 网络栈 | Compose 创建 IPv4/IPv6 双栈 bridge；IPv6 依赖宿主机路由和 NAT66 |
 
 官方 agent 是动态链接的 PyInstaller 单文件程序。运行镜像基于 Debian 12 slim，包含 glibc、`zlib1g`、CA 证书和 `tini`。下载阶段使用的 `curl`、`tar` 不会进入最终镜像。
 
