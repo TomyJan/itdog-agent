@@ -12,10 +12,7 @@ services:
     volumes:
       - itdog-agent-data:/opt/itdog-agent
     restart: unless-stopped
-
-networks:
-  default:
-    enable_ipv6: true
+    network_mode: host
 
 volumes:
   itdog-agent-data:
