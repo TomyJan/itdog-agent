@@ -107,7 +107,7 @@ docker compose up -d
 | `LimitNOFILE=1048576` | Compose `nofile` 软硬限制均为 `1048576` |
 | systemd 自动重启 | `restart: unless-stopped` |
 | root 服务创建原始 ICMP socket | 仅增加 `NET_RAW` capability |
-| 直接使用宿主机 IP 网络栈 | Compose 创建 IPv4/IPv6 双栈 bridge；IPv6 依赖宿主机路由和 NAT66 |
+| 直接使用宿主机 IP 网络栈 | 使用 host 网络模式 |
 
 官方 agent 是动态链接的 PyInstaller 单文件程序。运行镜像基于 Debian 12 slim，包含 glibc、`zlib1g`、CA 证书和 `tini`。下载阶段使用的 `curl`、`tar` 不会进入最终镜像。
 
